@@ -1,0 +1,254 @@
+---
+title: "bigzuoye"
+author: "Liuzhengyuan"
+date: "2021/12/22"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+A=read.table('winequality-red.csv',sep=';',head=TRUE)
+library(MASS)
+
+```
+1 kmeans聚类算法
+```{r}
+library(factoextra)
+df=scale(A)
+#确定最佳聚类数目
+fviz_nbclust(df,kmeans,method='wss')+geom_vline(xintercept = 6,linetype=2)
+```
+
+```{r}
+#kmeans聚类
+set.seed(123)
+km_result=kmeans(df,6,nstart=1)
+print(km_result)
+dd=cbind(A,cluster=km_result$cluster)
+fviz_cluster(km_result,data=df,
+             paleter=c('red','green3','blue','cyan','yellow','magenta'),
+             ellipse.type='euclid',
+             repel=TRUE)
+```
+
+
+```{r}
+m1=mean(A$y[which(dd$cluster==1)])
+m2=mean(A$y[which(dd$cluster==2)])
+m3=mean(A$y[which(dd$cluster==3)])
+m4=mean(A$y[which(dd$cluster==4)])
+m5=mean(A$y[which(dd$cluster==5)])
+m6=mean(A$y[which(dd$cluster==6)])
+data.frame(m1,m2,m3,m4,m5,m6)
+counts=table(dd$y)
+barplot(counts,
+        xlab='Score',
+        ylab='number')
+``` 
+由于大部分酒分数是5分或者6分，因此我们可以将聚类分析得到的六类酒分为四档
+A group2
+B group3
+C group6
+D group1,4,5
+因此可以通过聚类分析做一个基础的评价
+
+```{r}
+lm.sol=lm(y~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11,data=A)
+summary(lm.sol)
+ll=stepAIC(lm.sol,direction='backward')
+summary(ll)
+anova(lm.sol,ll)
+AIC(lm.sol,ll)
+```
+
+
+
+```{r}
+library(psych)
+library(MASS)
+A=read.table('winequality-red.csv',sep=';',head=TRUE)
+#bartlett球形检验
+cortest.bartlett(cor(A))
+```
+分析结果表明，Bartlett球形检验的最终显著性，明显小于0.05，可以拒绝原假设，认为变量之间具有较强的相关性，适合进行主成分分析。
+```{r}
+fa.parallel(A[,-1],fa='pc',n.iter=100)
+lm.sol=lm(y~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11,data=A)
+summary(lm.sol)
+
+```
+
+
+```{r}
+A.pr=princomp(~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11,data=A,cor=T)
+summary(A.pr)
+pre=predict(A.pr)
+A$z1=pre[,1]
+A$z2=pre[,2]
+A$z3=pre[,3]
+A$z4=pre[,4]
+A$z5=pre[,5]
+lm.sol=lm(y~z1+z2+z3+z4+z5,data=A)
+summary(lm.sol)
+```
+
+
+```{r}
+
+beta=coef(lm.sol)
+AA=loadings(A.pr)
+x.bar=A.pr$center
+x.sd=A.pr$scale
+coef=(beta[2]*AA[,1]+beta[3]*AA[,2]+beta[4]*AA[,3]+beta[4]*AA[,4]+beta[6]*AA[,5])/x.sd
+beta0=beta[1]-sum(x.bar*coef)
+
+c(beta0,coef)
+```
+
+```{r}
+score=A$y[1:1599]
+M=matrix(rep(0,1599*12),nrow=1599,ncol=12)
+M[,1]=1
+M[,2]=A$x1[1:1599]
+M[,3]=A$x2[1:1599]
+M[,4]=A$x3[1:1599]
+M[,5]=A$x4[1:1599]
+M[,6]=A$x5[1:1599]
+M[,7]=A$x6[1:1599]
+M[,8]=A$x7[1:1599]
+M[,9]=A$x8[1:1599]
+M[,10]=A$x9[1:1599]
+M[,11]=A$x10[1:1599]
+M[,12]=A$x11[1:1599]
+pre=M%*%c(beta0,coef)
+mean(abs(pre-score))
+
+
+```
+
+```{r}
+score=A$y[1:30]
+M=matrix(rep(0,360),nrow=30,ncol=12)
+M[,1]=1
+M[,2]=A$x1[1:30]
+M[,3]=A$x2[1:30]
+M[,4]=A$x3[1:30]
+M[,5]=A$x4[1:30]
+M[,6]=A$x5[1:30]
+M[,7]=A$x6[1:30]
+M[,8]=A$x7[1:30]
+M[,9]=A$x8[1:30]
+M[,10]=A$x9[1:30]
+M[,11]=A$x10[1:30]
+M[,12]=A$x11[1:30]
+pre=M%*%c(beta0,coef)
+pre
+score
+par(new=TRUE)
+plot(c(1:30),score-pre,xlab='Number',ylab='error')
+abline(h=0.5,lty=2)
+abline(h=-0.5,lty=2)
+```
+
+```{r}
+
+```
+
+
+
+```{r}
+lm.sol=lm(y~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+I(x1^2)+I(x2^2)+I(x3^2)+I(x4^2)+I(x5^2)+I(x6^2)+I(x7^2)+I(x8^2)+I(x9^2)+I(x10^2)+I(x11^2)+I(x1*x2)+I(x1*x3)+I(x1*x4)+I(x1*x5)+I(x1*x6)+I(x1*x7)+I(x1*x8)+I(x1*x9)+I(x1*x10)+I(x1*x11)+I(x2*x3)+I(x2*x4)+I(x2*x5)+I(x2*x6)+I(x2*x7)+I(x2*x8)+I(x2*x9)+I(x2*x10)+I(x2*x11)+I(x3*x4)+I(x3*x5)+I(x3*x6)+I(x3*x7)+I(x3*x8)+I(x3*x9)+I(x3*x10)+I(x3*x11)+I(x4*x5)+I(x4*x6)+I(x4*x7)+I(x4*x8)+I(x4*x9)+I(x4*x10)+I(x4*x11)+I(x5*x6)+I(x5*x7)+I(x5*x8)+I(x5*x9)+I(x5*x10)+I(x5*x11)+I(x6*x7)+I(x6*x8)+I(x6*x9)+I(x6*x10)+I(x6*x11)+I(x7*x8)+I(x7*x9)+I(x7*x10)+I(x7*x11)+I(x8*x9)+I(x8*x10)+I(x8*x11)+I(x9*x10)+I(x9*x11)+I(x10*x11),data=A)
+summary(lm.sol)
+```
+
+```{r}
+pc=principal(A[,-1],nfactors = 5,scores=T,rotate='varimax')
+pc
+```
+
+```{r}
+A.pr=princomp(~x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11+I(x1^2)+I(x2^2)+I(x3^2)+I(x4^2)+I(x5^2)+I(x6^2)+I(x7^2)+I(x8^2)+I(x9^2)+I(x10^2)+I(x11^2)+I(x1*x2)+I(x1*x3)+I(x1*x4)+I(x1*x5)+I(x1*x6)+I(x1*x7)+I(x1*x8)+I(x1*x9)+I(x1*x10)+I(x1*x11)+I(x2*x3)+I(x2*x4)+I(x2*x5)+I(x2*x6)+I(x2*x7)+I(x2*x8)+I(x2*x9)+I(x2*x10)+I(x2*x11)+I(x3*x4)+I(x3*x5)+I(x3*x6)+I(x3*x7)+I(x3*x8)+I(x3*x9)+I(x3*x10)+I(x3*x11)+I(x4*x5)+I(x4*x6)+I(x4*x7)+I(x4*x8)+I(x4*x9)+I(x4*x10)+I(x4*x11)+I(x5*x6)+I(x5*x7)+I(x5*x8)+I(x5*x9)+I(x5*x10)+I(x5*x11)+I(x6*x7)+I(x6*x8)+I(x6*x9)+I(x6*x10)+I(x6*x11)+I(x7*x8)+I(x7*x9)+I(x7*x10)+I(x7*x11)+I(x8*x9)+I(x8*x10)+I(x8*x11)+I(x9*x10)+I(x9*x11)+I(x10*x11),data=A,cor=T)
+summary(A.pr)
+pre=predict(A.pr)
+A$z1=pre[,1]
+A$z2=pre[,2]
+A$z3=pre[,3]
+A$z4=pre[,4]
+A$z5=pre[,5]
+lm.sol=lm(y~z1+z2+z3+z4+z5,data=A)
+summary(lm.sol)
+```
+
+
+```{r}
+ll=stepAIC(lm.sol,direction='backward')
+summary(ll)
+t=predict(ll,A)-A$y
+mean(abs(t))
+```
+
+
+```{r}
+lm.sol=lm(y~x2+x5+x7+x10+x11,data=A)
+summary(lm.sol)
+lm.sol=lm(y~x2+x5+x7+x10+x11+I(x2^2)+I(x5^2)+I(x7^2)+I(x10^2)+I(x11^2)+I(x2*x5)+I(x2*x7)+I(x2*x10)+I(x2*x11)+I(x5*x7)+I(x5*x10)+I(x5*x11)+I(x7*x10)+I(x7*x11)+I(x10*x11),data=A)
+ll=stepAIC(lm.sol,direction='backward')
+```
+
+
+```{r}
+library(DALEX)
+library(iBreakDown)
+library(car)
+library(questionr)
+try(data(package='DALEX'))
+data(HR)
+```
+
+
+```{r}
+# split
+data(A)
+A$y=factor(A$y)
+set.seed(512)
+ind = sample(2,nrow(A),replace=TRUE,prob=c(0.9,0.1))
+trainData = A[ind==1,]
+testData = A[ind==2,]
+
+# randforest
+library(randomForest)
+m_rf = randomForest(y ~ . , data = A)
+```
+
+```{r}
+# Prediction and Confusion Matrix - Training data 
+library(caret)
+pred1 <- predict(m_rf, trainData)
+head(pred1)
+confusionMatrix(pred1,trainData$y)  #
+
+pred2 <- predict(m_rf, testData)
+head(pred2)
+confusionMatrix(pred2, testData$y)  #
+
+
+```
+```{r}
+# vip
+library(vip)
+vip(m_rf)
+var=randomForest::importance(m_rf)
+var
+```
+```{r}
+new_observation=tail(A,1)
+p_fun <- function(object, newdata){predict(object, newdata = newdata, type = "prob")}
+bd_rf <- local_attributions(m_rf,
+                            data = A,
+                            new_observation =  new_observation,
+                            predict_function = p_fun)
+
+bd_rf
+plot(bd_rf)
+```
